@@ -25,7 +25,7 @@ def test_cli(tmp_path):
         check=True,
         text=True,
     )
-    assert res.stderr == ""
+    assert res.stderr == f"[0] Finding comprehensions in: {file1}\n"
     assert res.stdout == textwrap.dedent(
         f"""
         {file1}:

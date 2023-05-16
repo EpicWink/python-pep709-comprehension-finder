@@ -1,6 +1,7 @@
 import ast
 import builtins
 import sys
+import time
 
 from contextlib import contextmanager
 from pathlib import Path
@@ -13,7 +14,16 @@ def find_709_comps_in_files(path: Path):
         paths = [path]
     elif path.is_dir():
         paths = path.glob("**/*.py")
-    return {str(p): find_709_comps_in_file(p) for p in paths if p.is_file()}
+    problems = {}
+    last_log = 0.0
+    for i, path in enumerate(paths):
+        if not path.is_file():
+            continue
+        if time.monotonic() > last_log + 0.8:
+            print(f"[{i}] Finding comprehensions in: {path}", file=sys.stderr)
+            last_log = time.monotonic()
+        problems[str(path)] = find_709_comps_in_file(path)
+    return problems
 
 
 def find_709_comps_in_file(filepath: Path):
