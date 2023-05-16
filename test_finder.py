@@ -2,7 +2,9 @@ import subprocess
 import sys
 import textwrap
 
-from finder import find_709_comps, find_709_comps_in_files
+import pytest
+
+from finder import ParseError, find_709_comps, find_709_comps_in_files
 
 
 def test_cli(tmp_path):
@@ -96,30 +98,27 @@ def test_in_file(tmp_path):
     assert find_709_comps_in_files(file_path) == {str(file_path): [(5, "incr")]}
 
 
-def test_bad_encoding(tmp_path):
+def test_bad_encoding(capsys, tmp_path):
     file_path = tmp_path / "file.py"
     file_path.write_bytes("foo".encode("utf16"))
-    assert find_709_comps_in_files(file_path) == {
-        str(file_path): [
-            (
-                0,
-                "Could not decode file with default encoding ('utf-8' codec can't decode byte 0xff in position 0: invalid start byte).",
-            )
-        ]
-    }
+    assert find_709_comps_in_files(file_path) == {str(file_path): []}
+    captured = capsys.readouterr()
+    assert (
+        f"Could not decode file '{file_path}' with default encoding: "
+        f"[UnicodeDecodeError] 'utf-8' codec can't decode byte 0xff in position 0: "
+        f"invalid start byte"
+    ) in captured.err.splitlines()
 
 
-def test_bad_characters(tmp_path):
+def test_bad_characters(capsys, tmp_path):
     file_path = tmp_path / "file.py"
     file_path.write_bytes(b"\x00\x00")
-    assert find_709_comps_in_files(file_path) == {
-        str(file_path): [
-            (
-                0,
-                "Unable to parse file (source code string cannot contain null bytes).",
-            )
-        ]
-    }
+    assert find_709_comps_in_files(file_path) == {str(file_path): []}
+    captured = capsys.readouterr()
+    assert (
+        f"Unable to parse file '{file_path}': [ValueError] source code string cannot "
+        f"contain null bytes"
+    ) in captured.err.splitlines()
 
 
 def run(codestr: str) -> list[tuple[int, str]]:
@@ -366,14 +365,17 @@ def test_bad_syntax():
     codestr = """
     foo = "
     """
-    assert run(codestr) == [
-        (
-            0,
-            "Unable to parse file (unterminated string literal (detected at line 2) (<unknown>, line 2)).",
-        )
-    ]
+    with pytest.raises(ParseError) as exc_info:
+        run(codestr)
+    assert str(exc_info.value) == "Unable to parse file"
+    assert str(exc_info.value.__cause__) == (
+        "unterminated string literal (detected at line 2) (<unknown>, line 2)"
+    )
 
 
 def test_ast_too_nested():
     codestr = f"a = 1\nb = a{' + a' * 1000}\n"
-    assert run(codestr) == [(0, "Recursion error (maximum recursion depth exceeded).")]
+    with pytest.raises(ParseError) as exc_info:
+        run(codestr)
+    assert str(exc_info.value) == "Recursion error during visiting file"
+    assert str(exc_info.value.__cause__) == "maximum recursion depth exceeded"

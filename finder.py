@@ -8,6 +8,10 @@ from pathlib import Path
 from typing import Iterable, Generator, Sequence
 
 
+class ParseError(ValueError):
+    pass
+
+
 def find_709_comps_in_files(path: Path):
     paths: Iterable[Path]
     if path.is_file():
@@ -32,20 +36,30 @@ def find_709_comps_in_file(filepath: Path):
     try:
         codestr = contents.decode()
     except UnicodeDecodeError as e:
-        return [(0, f"Could not decode file with default encoding ({e}).")]
-    return find_709_comps(codestr)
+        print((
+            f"Could not decode file '{filepath}' with default encoding: "
+            f"[{e.__class__.__name__}] {e}"
+        ), file=sys.stderr)  # fmt: skip
+        return []
+    try:
+        return find_709_comps(codestr)
+    except ParseError as e:
+        print((
+            f"{e} '{filepath}': [{e.__cause__.__class__.__name__}] {e.__cause__}"
+        ), file=sys.stderr)  # fmt: skip
+        return []
 
 
 def find_709_comps(codestr: str) -> list[tuple[int, str]]:
     try:
         tree = ast.parse(codestr)
     except (SyntaxError, ValueError) as e:
-        return [(0, f"Unable to parse file ({e}).")]
+        raise ParseError("Unable to parse file") from e
     finder = CompFinder()
     try:
         finder.visit(tree)
     except RecursionError as e:
-        return [(0, f"Recursion error ({e}).")]
+        raise ParseError("Recursion error during visiting file") from e
     return finder.problems
 
 
