@@ -243,10 +243,11 @@ if __name__ == "__main__":
     results = {}
     for path in sys.argv[1:]:
         results.update(find_709_comps_in_files(Path(path)))
+    results_with_problems = {p: r for p, r in results.items() if r}
     print()
-    for path, problems in results.items():
-        if not problems:
-            continue
+    for path, problems in results_with_problems.items():
         print(f"{path}:")
         for lineno, varname in problems:
             print(f"    {lineno} - {varname}")
+    if not results_with_problems:
+        print(f"Found no files with problems", file=sys.stderr)
