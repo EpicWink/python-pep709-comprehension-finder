@@ -27,12 +27,13 @@ def find_709_comps_in_files(path: Path):
 
 
 def find_709_comps_in_file(filepath: Path):
-    with filepath.open("r") as fh:
-        try:
-            codestr = fh.read()
-        except UnicodeDecodeError as e:
-            return [(0, f"Could not decode file with default encoding ({e}).")]
-        return find_709_comps(codestr)
+    with filepath.open(mode="rb") as fh:
+        contents = fh.read()
+    try:
+        codestr = contents.decode()
+    except UnicodeDecodeError as e:
+        return [(0, f"Could not decode file with default encoding ({e}).")]
+    return find_709_comps(codestr)
 
 
 def find_709_comps(codestr: str) -> list[tuple[int, str]]:
